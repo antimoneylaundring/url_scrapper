@@ -5,14 +5,18 @@ import urllib.parse
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.service import Service
 import random
 import pandas as pd
 import io
+
 
 EXCLUDE_DOMAINS = [
     "youtube.com", "twitter.com", "x.com", "instagram.com",
     "linkedin.com", "justdial.com", "quora.com", "reddit.com", "telegram.org"
 ]
+
 
 # Strong Normalizer (Important!)
 def normalize_url_for_compare(url):
@@ -37,17 +41,24 @@ def normalize_url_for_compare(url):
     
     return url.strip()
 
+
 def scrape_google_search(keyword, pages, progress_placeholder):
     options = Options()
     options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-extensions")
     options.add_argument("--log-level=3")
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36")
     
     try:
-        driver = webdriver.Chrome(options=options)
+        driver = webdriver.Chrome(
+            service=Service(ChromeDriverManager().install()),
+            options=options
+        )
     except Exception as e:
-        st.error(f"Error: Could not initialize Chrome driver. Make sure Chrome is installed.")
+        st.error(f"Error: Could not initialize Chrome driver. Make sure Chrome is installed. Details: {e}")
         return []
     
     driver.set_page_load_timeout(15)
@@ -98,6 +109,7 @@ def scrape_google_search(keyword, pages, progress_placeholder):
     
     driver.quit()
     return results
+
 
 def main():
     st.set_page_config(page_title="Google Search Web Scraper", page_icon="🔍", layout="wide")
@@ -233,7 +245,7 @@ def main():
                 st.download_button(
                     label="📥 Download Results as CSV",
                     data=csv_content,
-                    file_name="scraped_AML_results.csv",
+                    file_name="scraped_results.csv",
                     mime="text/csv",
                     use_container_width=True
                 )
@@ -241,6 +253,7 @@ def main():
                 st.warning("⚠️ No results found after filtering.")
     else:
         st.info("👆 Use either tab above to provide keywords for scraping")
+
 
 if __name__ == "__main__":
     main()
