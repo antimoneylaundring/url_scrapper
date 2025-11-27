@@ -11,6 +11,14 @@ import random
 import pandas as pd
 import io
 
+import subprocess
+import sys
+
+# Install missing packages
+packages = ["selenium==4.15.2", "webdriver-manager==4.0.1"]
+for package in packages:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
 
 EXCLUDE_DOMAINS = [
     "youtube.com", "twitter.com", "x.com", "instagram.com",
