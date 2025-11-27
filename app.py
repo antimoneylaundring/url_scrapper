@@ -1,23 +1,9 @@
 import streamlit as st
 import csv
-import time
-import urllib.parse
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.chrome.service import Service
-import random
 import pandas as pd
 import io
-
-import subprocess
-import sys
-
-# Install missing packages
-packages = ["selenium==4.15.2", "webdriver-manager==4.0.1"]
-for package in packages:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 
 EXCLUDE_DOMAINS = [
@@ -26,129 +12,104 @@ EXCLUDE_DOMAINS = [
 ]
 
 
-# Strong Normalizer (Important!)
-def normalize_url_for_compare(url):
-    url = str(url).strip().lower()
-    
-    # remove protocol
-    if url.startswith("http://"):
-        url = url.replace("http://", "", 1)
-    elif url.startswith("https://"):
-        url = url.replace("https://", "", 1)
-    
-    # remove path/query/hash
-    url = url.split('/')[0].split('?')[0].split('#')[0]
-    
-    # remove leading www.
-    if url.startswith("www."):
-        url = url[4:]
-    
-    # remove port if exists
-    if ":" in url:
-        url = url.split(":")[0]
-    
-    return url.strip()
-
-
-def scrape_google_search(keyword, pages, progress_placeholder):
-    options = Options()
-    options.add_argument("--disable-blink-features=AutomationControlled")
-    options.add_argument("--headless")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-extensions")
-    options.add_argument("--log-level=3")
-    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36")
-    
+@st.cache_resource
+def get_google_search_service(api_key, search_engine_id):
+    """Initialize Google Custom Search API service"""
     try:
-        driver = webdriver.Chrome(
-            service=Service(ChromeDriverManager().install()),
-            options=options
-        )
+        service = build("customsearch", "v1", developerKey=api_key)
+        return service
     except Exception as e:
-        st.error(f"Error: Could not initialize Chrome driver. Make sure Chrome is installed. Details: {e}")
+        st.error(f"❌ Failed to initialize Google Search API: {str(e)}")
+        return None
+
+
+def search_google(keyword, api_key, search_engine_id, num_results=10):
+    """Search using Google Custom Search API"""
+    service = get_google_search_service(api_key, search_engine_id)
+    
+    if service is None:
         return []
     
-    driver.set_page_load_timeout(15)
     results = []
     
-    for page in range(pages):
-        start = page * 10
-        search_url = f'https://www.google.com/search?q="{urllib.parse.quote_plus(keyword)}"&start={start}'
+    try:
+        request = service.cse().list(
+            q=keyword,
+            cx=search_engine_id,
+            num=min(num_results, 10),  # API returns max 10 per request
+            startIndex=1
+        )
         
-        progress_placeholder.info(f"📄 Loading page {page+1}/{pages} for '{keyword}'...")
+        response = request.execute()
         
-        try:
-            driver.get(search_url)
-        except Exception as e:
-            progress_placeholder.warning(f"⚠️ Timeout or error on page {page+1}: {e}")
-            break
+        if 'items' not in response:
+            return []
         
-        time.sleep(random.randint(5, 8))
+        for item in response['items']:
+            url = item.get('link', '')
+            domain = url.split('/')[2].lower() if url else ''
+            
+            # Filter excluded domains
+            if any(excluded in domain for excluded in EXCLUDE_DOMAINS):
+                continue
+            
+            results.append({
+                "Domain": domain,
+                "URL": url,
+                "Title": item.get('title', ''),
+                "Snippet": item.get('snippet', '')
+            })
         
-        page_source = driver.page_source
-        if ("unusual traffic" in page_source or "detected unusual traffic" in page_source or 
-            "captcha" in page_source or "To continue, please type the characters below" in page_source):
-            progress_placeholder.error(f"❌ Blocked by Google on keyword: {keyword}, page: {page+1}")
-            break
-        
-        search_results = driver.find_elements(By.CSS_SELECTOR, 'a')
-        found = 0
-        
-        for result in search_results:
-            href = result.get_attribute('href')
-            if (href and href.startswith("http") and 
-                "google." not in href and 
-                "webcache.googleusercontent.com" not in href):
-                
-                domain = urllib.parse.urlparse(href).netloc.lower()
-                
-                if any(excluded in domain for excluded in EXCLUDE_DOMAINS):
-                    continue
-                
-                results.append({
-                    "Domain": domain,
-                    "URL": href
-                })
-                found += 1
-        
-        if found == 0:
-            break
+        return results
     
-    driver.quit()
-    return results
+    except HttpError as e:
+        st.error(f"❌ Google Search API Error: {e}")
+        return []
+    except Exception as e:
+        st.error(f"❌ Error during search: {str(e)}")
+        return []
 
 
 def main():
-    st.set_page_config(page_title="Google Search Web Scraper", page_icon="🔍", layout="wide")
+    st.set_page_config(
+        page_title="Google Search API Scraper",
+        page_icon="🔍",
+        layout="wide"
+    )
     
-    st.title("🔍 Google Search Web Scraper")
+    st.title("🔍 Google Custom Search API Scraper")
     st.markdown("---")
-    
-    # Instructions
-    with st.expander("ℹ️ How to use this app", expanded=False):
-        st.markdown("""
-        **Option 1: Upload Keywords File**
-        1. Upload an Excel file (`.xlsx`) with a 'Keywords' column
-        
-        **Option 2: Enter Keywords Manually**
-        1. Enter keywords in the text area (one per line)
-        
-        2. Configure scraping options
-        3. Click 'Start Scraping'
-        4. Download results as CSV
-        
-        **Note**: Each page contains approximately 10 search results.
-        """)
     
     # Sidebar Configuration
     st.sidebar.header("⚙️ Configuration")
-    pages = st.sidebar.slider("Number of pages to scrape:", 1, 50, 3, help="Each page has ~10 results")
+    
+    # API Key Input
+    api_key = st.sidebar.text_input(
+        "Google API Key",
+        type="password",
+        help="Get from Google Cloud Console"
+    )
+    
+    # Search Engine ID Input
+    search_engine_id = st.sidebar.text_input(
+        "Search Engine ID",
+        help="Get from Programmable Search Engine"
+    )
+    
+    # Results per keyword
+    results_per_keyword = st.sidebar.slider(
+        "Results per keyword:",
+        min_value=1,
+        max_value=10,
+        value=10,
+        help="Google free tier: max 10 per query"
+    )
     
     st.sidebar.markdown("---")
     st.sidebar.info("📊 **Excluded Domains**: YouTube, Twitter, Instagram, LinkedIn, Quora, Reddit, Telegram, JustDial")
+    st.sidebar.warning("⚠️ **Free Tier**: 100 queries/day. Each keyword = 1 query.")
     
-    # Main Content - Tabs for different input methods
+    # Main Content - Tabs
     tab1, tab2 = st.tabs(["📁 Upload File", "✏️ Manual Input"])
     
     keywords = []
@@ -156,7 +117,11 @@ def main():
     # TAB 1: Upload File
     with tab1:
         st.subheader("📁 Upload Keywords File")
-        uploaded_file = st.file_uploader("Choose an Excel file", type="xlsx", label_visibility="collapsed")
+        uploaded_file = st.file_uploader(
+            "Choose an Excel file (.xlsx)",
+            type="xlsx",
+            label_visibility="collapsed"
+        )
         
         if uploaded_file is not None:
             try:
@@ -164,16 +129,17 @@ def main():
                 if 'Keywords' not in df.columns:
                     st.error("❌ Error: Excel file must contain a 'Keywords' column")
                 else:
-                    keywords = df['Keywords'].dropna().tolist()
+                    keywords = df['Keywords'].dropna().astype(str).tolist()
                     st.success(f"✅ Loaded {len(keywords)} keywords")
                     
                     with st.expander("👀 View Keywords"):
-                        st.write(keywords)
+                        for i, kw in enumerate(keywords, 1):
+                            st.write(f"{i}. {kw}")
             
             except Exception as e:
-                st.error(f"❌ Error reading file: {e}")
+                st.error(f"❌ Error reading file: {str(e)}")
         else:
-            st.info("👆 Upload an Excel file (.xlsx) with a 'Keywords' column to begin")
+            st.info("👆 Upload an Excel file (.xlsx) with a 'Keywords' column")
     
     # TAB 2: Manual Input
     with tab2:
@@ -186,81 +152,103 @@ def main():
         
         if keyword_text.strip():
             keywords = [kw.strip() for kw in keyword_text.split('\n') if kw.strip()]
-            st.success(f"✅ Ready to scrape {len(keywords)} keywords")
+            st.success(f"✅ Ready to search {len(keywords)} keywords")
             
             with st.expander("👀 View Keywords"):
-                st.write(keywords)
+                for i, kw in enumerate(keywords, 1):
+                    st.write(f"{i}. {kw}")
         else:
-            st.info("👆 Enter keywords in the text area above to begin")
+            st.info("👆 Enter keywords in the text area above")
     
-    # Scraping Section (Common for both tabs)
+    # Search Section
     st.markdown("---")
     
     if keywords:
-        if st.button("🚀 Start Scraping", key="scrape_btn", use_container_width=True):
+        if st.button("🚀 Start Search", key="search_btn", use_container_width=True):
+            # Validate API credentials
+            if not api_key or not search_engine_id:
+                st.error("❌ Please provide both API Key and Search Engine ID in the sidebar")
+                return
+            
             all_results = []
             total_found = 0
             
-            with st.status("🔄 Scraping in progress...", expanded=True) as status:
-                for kw in keywords:
-                    st.write(f"🔎 Scraping: **{kw}**")
-                    result = scrape_google_search(kw, pages, st.empty())
+            with st.status("🔄 Searching...", expanded=True) as status:
+                for idx, kw in enumerate(keywords, 1):
+                    st.write(f"🔎 [{idx}/{len(keywords)}] Searching: **{kw}**")
+                    
+                    result = search_google(kw, api_key, search_engine_id, results_per_keyword)
                     total_found += len(result)
-                    st.write(f"   ✓ Found {len(result)} URLs")
                     all_results.extend(result)
+                    
+                    st.write(f"   ✓ Found {len(result)} results")
                 
                 # Remove duplicate domains
                 st.write("🔄 Removing duplicates...")
                 unique = {}
                 for item in all_results:
-                    parsed = urllib.parse.urlparse(item["URL"])
-                    base_url = f"{parsed.scheme}://{parsed.netloc}"
-                    unique[base_url] = {
-                        "Domain": item["Domain"],
-                        "URL": base_url
-                    }
-                all_results = list(unique.values())
+                    url = item.get("URL", "")
+                    domain = url.split('/')[2] if url else ""
+                    
+                    if domain not in unique:
+                        unique[domain] = item
                 
-                status.update(label="✅ Scraping completed!", state="complete")
+                all_results = list(unique.values())
+                status.update(label="✅ Search completed!", state="complete")
             
             # Results Section
             st.markdown("---")
             st.subheader("📊 Results")
             
-            results_col1, results_col2, results_col3 = st.columns(3)
-            with results_col1:
-                st.metric("Keywords Scraped", len(keywords))
-            with results_col2:
-                st.metric("Total URLs Found (Before Dedup)", total_found)
-            with results_col3:
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Keywords Searched", len(keywords))
+            with col2:
+                st.metric("Total Results Found (Before Dedup)", total_found)
+            with col3:
                 st.metric("Unique Domains", len(all_results))
             
-            # Display Results Table
+            # Display Results
             if all_results:
+                # Create dataframe for display
+                display_df = pd.DataFrame(all_results)[["Domain", "Title", "URL"]]
+                
                 st.dataframe(
-                    pd.DataFrame(all_results),
+                    display_df,
                     use_container_width=True,
                     height=400
                 )
                 
-                # Download Button
+                # Download as CSV
                 csv_buffer = io.StringIO()
-                writer = csv.DictWriter(csv_buffer, fieldnames=["Domain", "URL"])
-                writer.writeheader()
-                writer.writerows(all_results)
+                display_df.to_csv(csv_buffer, index=False)
                 csv_content = csv_buffer.getvalue()
                 
                 st.download_button(
                     label="📥 Download Results as CSV",
                     data=csv_content,
-                    file_name="scraped_results.csv",
+                    file_name=f"google_search_results_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
                     mime="text/csv",
                     use_container_width=True
                 )
+                
+                # Download as Excel
+                excel_buffer = io.BytesIO()
+                with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+                    display_df.to_excel(writer, sheet_name='Results', index=False)
+                excel_buffer.seek(0)
+                
+                st.download_button(
+                    label="📥 Download Results as Excel",
+                    data=excel_buffer.getvalue(),
+                    file_name=f"google_search_results_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
             else:
-                st.warning("⚠️ No results found after filtering.")
+                st.warning("⚠️ No results found.")
     else:
-        st.info("👆 Use either tab above to provide keywords for scraping")
+        st.info("👆 Use either tab above to provide keywords")
 
 
 if __name__ == "__main__":
