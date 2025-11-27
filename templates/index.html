@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Web Scraper</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        textarea,
+        input[type="file"],
+        input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 1em;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+
+        textarea:focus,
+        input[type="file"]:focus,
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .file-input-label {
+            display: inline-block;
+            padding: 10px 15px;
+            background: #f5f5f5;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .file-input-label:hover {
+            background: #e0e0e0;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px 20px;
+            font-size: 1.1em;
+            font-weight: 600;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .progress-section {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 5px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .progress-section.show {
+            display: block;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        .progress-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .progress-item {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .progress-item-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .progress-item-value {
+            font-size: 1.8em;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .progress-message {
+            padding: 15px;
+            background: white;
+            border-radius: 5px;
+            text-align: center;
+            color: #333;
+        }
+
+        .download-section {
+            background: #f0f8ff;
+            padding: 20px;
+            border-radius: 5px;
+            margin-top: 20px;
+            text-align: center;
+            display: none;
+        }
+
+        .download-section.show {
+            display: block;
+        }
+
+        .download-btn {
+            background: #28a745;
+            color: white;
+            padding: 15px 30px;
+            font-size: 1.1em;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .download-btn:hover {
+            background: #218838;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(40, 167, 69, 0.4);
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 3px;
+        }
+
+        .info-box strong {
+            color: #667eea;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .tab-btn {
+            padding: 10px 15px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Google Search Web Scraper</h1>
+            <p>Fast & Reliable Web Scraping Tool</p>
+        </div>
+
+        <div class="content">
+            <div class="info-box">
+                <strong>ℹ️ Info:</strong> Enter keywords to scrape Google Search results. Upload old URLs to exclude
+                them from results.
+            </div>
+
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('keywords')">📝 Keywords</button>
+                <button class="tab-btn" onclick="switchTab('settings')">⚙️ Settings</button>
+            </div>
+
+            <div id="keywords" class="tab-content active">
+                <form id="scraperForm">
+                    <div class="form-group">
+                        <label>Enter Keywords (one per line):</label>
+                        <textarea id="keywordsInput"
+                            placeholder="aml detection&#10;anti money laundering&#10;fraud detection"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Or Upload Keywords File (Excel):</label>
+                        <label class="file-input-label">
+                            📁 Choose File
+                            <input type="file" id="keywordsFile" accept=".xlsx,.xls">
+                        </label>
+                        <div id="keywordsFileName" style="margin-top: 8px; color: #666;"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Upload Old URLs to Exclude (Optional):</label>
+                        <label class="file-input-label">
+                            📁 Choose File
+                            <input type="file" id="oldUrlsFile" accept=".xlsx,.xls">
+                        </label>
+                        <div id="oldUrlsFileName" style="margin-top: 8px; color: #666;"></div>
+                    </div>
+
+                    <div class="button-group">
+                        <button type="submit" class="btn-primary" id="submitBtn">🚀 Start Scraping</button>
+                        <button type="reset" class="btn-secondary">🔄 Clear</button>
+                    </div>
+                </form>
+            </div>
+
+            <div id="settings" class="tab-content">
+                <div class="form-group">
+                    <label>Number of Pages to Scrape:</label>
+                    <input type="number" id="maxPages" min="1" max="10" value="2">
+                </div>
+                <p style="color: #666; margin-top: 15px;">
+                    <strong>Note:</strong> Each page has ~10 results. Google may block after 3-5 pages.
+                </p>
+            </div>
+
+            <!-- Progress Section -->
+            <div class="progress-section" id="progressSection">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+
+                <div class="progress-info">
+                    <div class="progress-item">
+                        <div class="progress-item-label">Progress</div>
+                        <div class="progress-item-value"><span id="currentKeyword">0</span>/<span
+                                id="totalKeywords">0</span></div>
+                    </div>
+                    <div class="progress-item">
+                        <div class="progress-item-label">Current Keyword</div>
+                        <div class="progress-item-value" id="keywordDisplay" style="font-size: 1.2em;">-</div>
+                    </div>
+                    <div class="progress-item">
+                        <div class="progress-item-label">Results Found</div>
+                        <div class="progress-item-value"><span id="resultsCount">0</span></div>
+                    </div>
+                </div>
+
+                <div class="progress-message" id="progressMessage">Starting scrape...</div>
+            </div>
+
+            <!-- Download Section -->
+            <div class="download-section" id="downloadSection">
+                <h3>✅ Scraping Complete!</h3>
+                <p id="resultsSummary" style="margin: 15px 0;"></p>
+                <a id="downloadBtn" class="download-btn" href="#">📥 Download Results (CSV)</a>
+            </div>
+
+            <!-- Error Section -->
+            <div class="error-message" id="errorMessage"></div>
+        </div>
+    </div>
+
+    <script>
+        // File input handlers
+        document.getElementById('keywordsFile').addEventListener('change', function () {
+            const filename = this.files[0]?.name || '';
+            document.getElementById('keywordsFileName').textContent = filename ? '✓ File: ' + filename : '';
+        });
+
+        document.getElementById('oldUrlsFile').addEventListener('change', function () {
+            const filename = this.files[0]?.name || '';
+            document.getElementById('oldUrlsFileName').textContent = filename ? '✓ File: ' + filename : '';
+        });
+
+        // Tab switching
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Form submission
+        document.getElementById('scraperForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const formData = new FormData();
+            const keywordsInput = document.getElementById('keywordsInput').value;
+            const keywordsFile = document.getElementById('keywordsFile').files[0];
+            const oldUrlsFile = document.getElementById('oldUrlsFile').files[0];
+            const maxPages = document.getElementById('maxPages').value;
+
+            if (!keywordsInput && !keywordsFile) {
+                showError('Please enter keywords or upload a file');
+                return;
+            }
+
+            formData.append('keywords', keywordsInput);
+            if (keywordsFile) formData.append('keywords_file', keywordsFile);
+            if (oldUrlsFile) formData.append('old_urls_file', oldUrlsFile);
+            formData.append('max_pages', maxPages);
+
+            try {
+                // Hide error
+                document.getElementById('errorMessage').classList.remove('show');
+
+                // Show progress
+                document.getElementById('progressSection').classList.add('show');
+                document.getElementById('downloadSection').classList.remove('show');
+                document.getElementById('submitBtn').disabled = true;
+
+                // Start scraping
+                const response = await fetch('/api/scrape', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) throw new Error('Failed to start scraping');
+
+                // Poll for progress
+                pollProgress();
+            } catch (error) {
+                showError(error.message);
+                document.getElementById('submitBtn').disabled = false;
+            }
+        });
+
+        // Poll progress
+        async function pollProgress() {
+            try {
+                const response = await fetch('/api/progress');
+                const data = await response.json();
+
+                // Update progress
+                const progress = data.keyword_index / data.total_keywords * 100;
+                document.getElementById('progressFill').style.width = progress + '%';
+                document.getElementById('currentKeyword').textContent = data.keyword_index;
+                document.getElementById('totalKeywords').textContent = data.total_keywords;
+                document.getElementById('keywordDisplay').textContent = data.current_keyword || '-';
+                document.getElementById('resultsCount').textContent = data.results_found;
+                document.getElementById('progressMessage').textContent = data.message;
+
+                if (data.status === 'running') {
+                    setTimeout(pollProgress, 500);
+                } else if (data.status === 'completed') {
+                    document.getElementById('downloadSection').classList.add('show');
+                    document.getElementById('resultsSummary').textContent =
+                        `Found ${data.results_found} results. Download your CSV file below.`;
+                    document.getElementById('downloadBtn').href =
+                        `/api/download/${data.filename}`;
+                    document.getElementById('submitBtn').disabled = false;
+                } else if (data.status === 'error') {
+                    showError(data.message);
+                    document.getElementById('submitBtn').disabled = false;
+                }
+            } catch (error) {
+                console.error('Error polling progress:', error);
+            }
+        }
+
+        function showError(message) {
+            const errorEl = document.getElementById('errorMessage');
+            errorEl.textContent = '❌ ' + message;
+            errorEl.classList.add('show');
+        }
+    </script>
+</body>
+
+</html>
